@@ -1,0 +1,3 @@
+task remoteTask {
+    println "remoteTask is execuse.............. "
+}
