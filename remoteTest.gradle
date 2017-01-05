@@ -1,3 +1,64 @@
-task remoteTask {
-    println "remoteTask is execuse.............. "
+tasks.whenTaskAdded (){
+task->
+    if(task.name == 'assembleRelease') {
+        task.doLast {
+            analyseLib()
+        }
+    }
+}
+
+
+/**
+ * 从project中读取所有的依赖项，并传入jar包后生成结果文件
+ */
+def analyseLib() {
+    Set<Project> projectSet = project.getRootProject().getAllprojects();//项目的所有子项目
+    List<String> fileDependency = new ArrayList<>();//存放本地文件依赖
+    List<String> mavenDependency = new ArrayList<>();//存放远程仓库依赖
+    String jarPath = 'E:/software/SdkInfo/LibAnalyseTools/LibAnalyse.jar'//工具所在路径，服务器上为E:/software/SdkInfo/LibAnalyseTools/LibAnalyse.jar
+    File jarFile = new File(jarPath)
+    if(!jarFile.exists()) {
+        println '指定路径不存在' + jarPath
+        return
+    }
+    for(Project proj : projectSet) {//遍历项目
+        println "PROJECT:    ${proj.name}"
+        proj.configurations.each {
+            conf ->
+                if(conf.name.equals("compile")) {
+                    conf.allDependencies.each { dep ->
+                        if(dep instanceof FileCollectionDependency) {//本地文件依赖 即compile file
+                            Set<File> files = ((FileCollectionDependency) dep).resolve();
+                            for (File file : files) {
+                                fileDependency.add(file.name)
+                                println file.name
+                            }
+                        } else if (dep instanceof ProjectDependency){//项目依赖 即compile project()
+
+                        } else if(dep.group != null){
+                            String str = "${dep.group}:${dep.name}:${dep.version}"
+                            mavenDependency.add(str)
+                            println str
+                        } else {
+                            fileDependency.add(dep.name)
+                            println dep.name
+                        }
+                    }
+                }
+        }
+    }
+    project.exec {
+        commandLine 'java', '-jar',
+                'E:/software/SdkInfo/LibAnalyseTools/LibAnalyse.jar',//工具所在路径，服务器上为E:/software/SdkInfo/LibAnalyseTools/LibAnalyse.jar
+                '-f',
+                fileDependency.toString(),//本地依赖，扫描结果，不需要配置
+                '-m',
+                mavenDependency.toString(),//远程依赖，扫描结果，不需要配置
+                '-n',
+                Project.name,//需要配置项目唯一的名称
+                '-s',
+                'E:/software/SdkInfo',//结果文件路径，服务器上为E:/software/SdkInfo
+                '-v',
+                Project.getVersion() //配置项目的版本号，比如从gradle.properties中获取
+    }
 }
